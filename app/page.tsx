@@ -25,7 +25,7 @@ export interface SessionState {
 
 export default function Home() {
   const [session, setSession] = useState<SessionState>({
-    id: 'VRC-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    id: 'VRC-LOADING',
     email: null,
     status: 'READY',
     code: null,
@@ -35,7 +35,6 @@ export default function Home() {
 
   const [logs, setLogs] = useState<Log[]>([])
   const logsEndRef = useRef<HTMLDivElement>(null)
-  const [mounted, setMounted] = useState(false)
 
   const addLog = (msg: string, level: Log['level'] = 'INFO') => {
     setLogs((prev) => [
@@ -50,7 +49,6 @@ export default function Home() {
   }
 
   useEffect(() => {
-    setMounted(true)
     // Generate a fresh ID on client-side mount to avoid hydration mismatch
     setSession((s) => ({
       ...s,
@@ -140,8 +138,6 @@ export default function Home() {
     setLogs([])
     addLog('SYS: Workflow reset to IDLE', 'WARN')
   }
-
-  if (!mounted) return null
 
   return (
     <main className="p-4 md:p-8">
