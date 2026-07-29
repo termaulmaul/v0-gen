@@ -41,7 +41,7 @@ export function createMailsyAccount(): MailsyAccount {
 
 /**
  * Wait for OTP email and extract the code
- * mailsy m is interactive, so we send Ctrl+C to exit after reading output
+ * mailsy m shows interactive menu with email list. Parse OTP from list without selecting.
  * @param timeout - Timeout in milliseconds
  * @returns OTP code if found
  */
@@ -52,17 +52,16 @@ export function waitForMailsyOTP(timeout = 60000): string | null {
 
     while (Date.now() - startTime < timeout) {
       try {
-        // Use spawnSync to run mailsy m with stdin input (Ctrl+C to exit)
-        // Send Ctrl+C signal after 1 second to terminate the interactive prompt
-        const result = spawnSync('bash', ['-c', 'timeout 2 mailsy m || true'], {
+        // Run mailsy m with timeout to capture the email list menu output
+        const result = spawnSync('bash', ['-c', 'timeout 2 mailsy m 2>&1 || true'], {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
         })
 
-        const output = result.stdout || ''
+        const output = result.stdout || result.stderr || ''
 
         // Check if output contains email list
-        if (!output || output.includes('No Emails') || output.includes('No messages')) {
+        if (!output || output.includes('No Emails') || output.includes('No messages') || !output.includes('From:')) {
           const elapsed = Date.now() - startTime
           const remaining = timeout - elapsed
           if (remaining > 0) {
@@ -75,15 +74,21 @@ export function waitForMailsyOTP(timeout = 60000): string | null {
           continue
         }
 
-        // Extract OTP code from the email output
-        // Email format in mailsy m output: "293462 is your Vercel sign up code"
-        const codeMatch =
-          output.match(/\b(\d{6})\s+is\s+your/) || // "293462 is your..."
-          output.match(/code[=:\s]+(\d{6})/) || // "code: 123456"
-          output.match(/\b(\d{6})\b/) // Any 6-digit number
+        // mailsy m menu format:
+        // 4. 255578 is your Vercel sign up code - From:  registration@vercel.com
+        // Extract OTP from the menu list (can appear anywhere with pattern: "<6-digit> is your")
+        const lines = output.split('\n')
+        for (const line of lines) {
+          const codeMatch = line.match(/\b(\d{6})\s+is\s+your/)
+          if (codeMatch && codeMatch[1]) {
+            return codeMatch[1]
+          }
+        }
 
-        if (codeMatch && codeMatch[1]) {
-          return codeMatch[1]
+        // Fallback: look for any 6-digit code
+        const fallbackMatch = output.match(/\b(\d{6})\b/)
+        if (fallbackMatch && fallbackMatch[1]) {
+          return fallbackMatch[1]
         }
       } catch (e) {
         // Continue polling on error
