@@ -88,12 +88,55 @@ export default function Home() {
   }
 
   const triggerSignup = async () => {
-    addLog('REQ: Launching Playwright browser context...', 'CMD')
-    addLog('NAV: vercel.com/signup/v0', 'SYS')
-    await new Promise((r) => setTimeout(r, 2000))
-    addLog(`INPUT: ${session.email} -> email_field`, 'SYS')
-    addLog('CLICK: submit_button', 'SYS')
-    setSession((s) => ({ ...s, status: 'POLLING' }))
+    try {
+      addLog('REQ: Launching Playwright browser context...', 'CMD')
+
+      // Launch browser
+      const launchRes = await fetch('/api/automation/browser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'launch' }),
+      })
+      if (!launchRes.ok) throw new Error('Failed to launch browser')
+
+      // Pull logs from backend
+      await new Promise((r) => setTimeout(r, 1000))
+      let browserLogs = await fetch('/api/automation/browser?action=getLogs').then((r) => r.json())
+      browserLogs.logs?.forEach((log: any) => {
+        addLog(`BROWSER: ${log.action}`, log.details ? 'SYS' : 'INFO')
+      })
+
+      // Navigate to signup
+      const navRes = await fetch('/api/automation/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'navigate' }),
+      })
+      if (!navRes.ok) throw new Error('Failed to navigate')
+
+      browserLogs = await fetch('/api/automation/browser?action=getLogs').then((r) => r.json())
+      browserLogs.logs?.forEach((log: any) => {
+        addLog(`BROWSER: ${log.action}`, log.details ? 'SYS' : 'INFO')
+      })
+
+      // Fill email
+      const emailRes = await fetch('/api/automation/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fillEmail', email: session.email }),
+      })
+      if (!emailRes.ok) throw new Error('Failed to fill email')
+
+      browserLogs = await fetch('/api/automation/browser?action=getLogs').then((r) => r.json())
+      browserLogs.logs?.forEach((log: any) => {
+        addLog(`BROWSER: ${log.action}`, log.details ? 'SYS' : 'INFO')
+      })
+
+      setSession((s) => ({ ...s, status: 'POLLING' }))
+    } catch (error) {
+      addLog(`ERR: ${error instanceof Error ? error.message : 'Signup failed'}`, 'ERROR')
+      setSession((s) => ({ ...s, auto: false }))
+    }
   }
 
   const startPoll = async () => {
@@ -123,10 +166,29 @@ export default function Home() {
   }
 
   const triggerVerify = async () => {
-    addLog(`REQ: Injecting ${session.code} to browser...`, 'CMD')
-    await new Promise((r) => setTimeout(r, 1500))
-    addLog('RES: Verification submitted', 'OK')
-    setSession((s) => ({ ...s, status: 'VERIFIED' }))
+    try {
+      addLog(`REQ: Injecting ${session.code} to browser...`, 'CMD')
+
+      const res = await fetch('/api/automation/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fillOTP', otp: session.code }),
+      })
+      if (!res.ok) throw new Error('Failed to fill OTP')
+
+      const browserLogsRes = await fetch('/api/automation/browser?action=getLogs').then((r) =>
+        r.json()
+      )
+      browserLogsRes.logs?.forEach((log: any) => {
+        addLog(`BROWSER: ${log.action}`, log.details ? 'SYS' : 'INFO')
+      })
+
+      addLog('RES: OTP verification submitted', 'OK')
+      setSession((s) => ({ ...s, status: 'VERIFIED' }))
+    } catch (error) {
+      addLog(`ERR: ${error instanceof Error ? error.message : 'OTP verification failed'}`, 'ERROR')
+      setSession((s) => ({ ...s, auto: false }))
+    }
   }
 
   const triggerCookieSync = async () => {
@@ -144,7 +206,17 @@ export default function Home() {
     setSession((s) => ({ ...s, status: 'COMPLETED', auto: false }))
   }
 
-  const reset = () => {
+  const reset = async () => {
+    try {
+      await fetch('/api/automation/browser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'close' }),
+      })
+    } catch (error) {
+      console.error('Failed to close browser:', error)
+    }
+
     setSession({
       id: 'VRC-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
       email: null,
