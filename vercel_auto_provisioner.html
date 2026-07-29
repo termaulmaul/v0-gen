@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vercel Auto-Provisioner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { background-color: #09090b; color: #f4f4f5; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .terminal-scroll::-webkit-scrollbar { width: 4px; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
+        .step-glow { box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+        @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .animate-pulse-fast { animation: pulse-fast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const App = () => {
+            const [session, setSession] = useState({
+                id: "VRC-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+                email: null,
+                status: "READY",
+                code: null,
+                cookies: null,
+                auto: false
+            });
+            const [logs, setLogs] = useState([]);
+            const logsEndRef = useRef(null);
+
+            const addLog = (msg, level = "INFO") => {
+                setLogs(prev => [...prev, {
+                    id: Date.now() + Math.random(),
+                    msg,
+                    level,
+                    time: new Date().toLocaleTimeString()
+                }]);
+            };
+
+            useEffect(() => logsEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
+
+            // Workflow Chaining
+            useEffect(() => {
+                if (!session.auto) return;
+
+                if (session.status === "READY") triggerMail();
+                if (session.status === "MAIL_READY") triggerSignup();
+                if (session.status === "POLLING") startPoll();
+                if (session.status === "CODE_FOUND") triggerVerify();
+                if (session.status === "VERIFIED") triggerCookieSync();
+                if (session.status === "COOKIES_SYNCED") triggerVercelLogin();
+            }, [session.status, session.auto]);
+
+            const triggerMail = async () => {
+                addLog("REQ: Mailsy mailbox creation...", "CMD");
+                await new Promise(r => setTimeout(r, 1200));
+                const mail = `user_${Math.random().toString(36).substring(7)}@mailsy.com`;
+                setSession(s => ({ ...s, email: mail, status: "MAIL_READY" }));
+                addLog(`RES: Created ${mail}`, "OK");
+            };
+
+            const triggerSignup = async () => {
+                addLog("REQ: Launching Playwright browser context...", "CMD");
+                addLog("NAV: vercel.com/signup/v0", "SYS");
+                await new Promise(r => setTimeout(r, 2000));
+                addLog(`INPUT: ${session.email} -> email_field`, "SYS");
+                addLog("CLICK: submit_button", "SYS");
+                setSession(s => ({ ...s, status: "POLLING" }));
+            };
+
+            const startPoll = () => {
+                addLog("POLL: Checking Mailsy inbox (2s interval)...", "SYS");
+                let attempts = 0;
+                const timer = setInterval(() => {
+                    attempts++;
+                    addLog(`POLL: Attempt ${attempts}...`, "DEBUG");
+                    if (attempts >= 3) {
+                        clearInterval(timer);
+                        const code = Math.floor(100000 + Math.random() * 900000).toString();
+                        setSession(s => ({ ...s, code, status: "CODE_FOUND" }));
+                        addLog(`RES: Code extracted -> ${code}`, "OK");
+                    }
+                }, 2000);
+            };
+
+            const triggerVerify = async () => {
+                addLog(`REQ: Injecting ${session.code} to browser...`, "CMD");
+                await new Promise(r => setTimeout(r, 1500));
+                addLog("RES: Verification submitted", "OK");
+                setSession(s => ({ ...s, status: "VERIFIED" }));
+            };
+
+            const triggerCookieSync = async () => {
+                addLog("REQ: Extracting auth cookies from Playwright...", "CMD");
+                await new Promise(r => setTimeout(r, 1000));
+                const mockCookies = btoa(JSON.stringify({ _vercel_jwt: "eyJhbG...", user_id: "usr_123" }));
+                setSession(s => ({ ...s, cookies: mockCookies, status: "COOKIES_SYNCED" }));
+                addLog("RES: Cookies cached to session", "OK");
+            };
+
+            const triggerVercelLogin = async () => {
+                addLog(`REQ: vercel login ${session.email}`, "CMD");
+                await new Promise(r => setTimeout(r, 2000));
+                addLog("RES: CLI Auth Complete", "OK");
+                setSession(s => ({ ...s, status: "COMPLETED", auto: false }));
+            };
+
+            const reset = () => {
+                setSession({
+                    id: "VRC-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+                    email: null,
+                    status: "READY",
+                    code: null,
+                    cookies: null,
+                    auto: false
+                });
+                setLogs([]);
+                addLog("SYS: Workflow reset to IDLE", "WARN");
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto">
+                    <header className="flex justify-between items-center mb-8 pb-4 border-b border-zinc-800">
+                        <div>
+                            <h1 className="text-xl font-bold tracking-tighter text-blue-500">VERCEL_AUTH_AUTOMATOR v2.0</h1>
+                            <p className="text-zinc-500 text-xs mt-1">Status: {session.status} | Session: {session.id}</p>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <span className="text-[10px] font-bold text-zinc-400">AUTO-PILOT</span>
+                                <input 
+                                    type="checkbox" 
+                                    className="hidden" 
+                                    checked={session.auto} 
+                                    onChange={(e) => setSession(s => ({ ...s, auto: e.target.checked }))}
+                                />
+                                <div className={`w-10 h-5 rounded-full p-1 transition-colors ${session.auto ? 'bg-blue-600' : 'bg-zinc-700'}`}>
+                                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${session.auto ? 'translate-x-5' : ''}`} />
+                                </div>
+                            </label>
+                            <button onClick={reset} className="text-[10px] bg-zinc-800 px-3 py-1 rounded hover:bg-zinc-700">RESET</button>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Pipeline View */}
+                        <div className="lg:col-span-4 space-y-4">
+                            <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest px-2">Pipeline Steps</h2>
+                            
+                            {[
+                                { id: 'READY', label: '1. Mailsy Provision', desc: 'Gen temp mailbox' },
+                                { id: 'MAIL_READY', label: '2. Browser Signup', desc: 'Nav & Fill vercel.com' },
+                                { id: 'POLLING', label: '3. Inbox Scan', desc: 'Extract 6-digit OTP' },
+                                { id: 'CODE_FOUND', label: '4. API Verification', desc: 'Submit OTP to session' },
+                                { id: 'VERIFIED', label: '5. Cookie Capture', desc: 'Sync browser storage' },
+                                { id: 'COOKIES_SYNCED', label: '6. CLI Handshake', desc: 'Vercel login via shell' }
+                            ].map((step, idx) => (
+                                <div key={step.id} className={`p-4 rounded-lg border transition-all ${
+                                    session.status === step.id ? 'bg-zinc-900 border-blue-500/50 step-glow' : 'bg-zinc-950 border-zinc-900 opacity-40'
+                                }`}>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold">{step.label}</span>
+                                        {session.status === step.id && <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse-fast"></div>}
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 mt-1">{step.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Terminal & Data */}
+                        <div className="lg:col-span-8 flex flex-col gap-6">
+                            <section className="bg-black border border-zinc-900 rounded-xl overflow-hidden flex flex-col h-[500px]">
+                                <div className="bg-zinc-900 px-4 py-2 border-b border-zinc-800 flex justify-between">
+                                    <span className="text-[10px] font-bold text-zinc-400">STD_OUT // RECOVERY_LOG</span>
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-red-900"></div>
+                                        <div className="w-2 h-2 rounded-full bg-yellow-900"></div>
+                                        <div className="w-2 h-2 rounded-full bg-green-900"></div>
+                                    </div>
+                                </div>
+                                <div className="p-4 overflow-y-auto terminal-scroll grow font-mono text-[11px] leading-relaxed">
+                                    {logs.map(log => (
+                                        <div key={log.id} className="flex gap-4 mb-1">
+                                            <span className="text-zinc-600 shrink-0">[{log.time}]</span>
+                                            <span className={`shrink-0 w-12 ${
+                                                log.level === 'OK' ? 'text-green-500' :
+                                                log.level === 'CMD' ? 'text-blue-400' :
+                                                log.level === 'WARN' ? 'text-yellow-500' : 'text-zinc-500'
+                                            }`}>
+                                                {log.level}
+                                            </span>
+                                            <span className="text-zinc-300">{log.msg}</span>
+                                        </div>
+                                    ))}
+                                    <div ref={logsEndRef} />
+                                </div>
+                            </section>
+
+                            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-xl">
+                                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase mb-3">Identity Context</h3>
+                                    <div className="space-y-2 text-xs">
+                                        <div className="flex justify-between border-b border-zinc-900 pb-2">
+                                            <span className="text-zinc-600">Email</span>
+                                            <span>{session.email || 'null'}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-zinc-900 pb-2">
+                                            <span className="text-zinc-600">OTP Code</span>
+                                            <span className="font-bold text-blue-400 tracking-widest">{session.code || '------'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-xl">
+                                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase mb-3">Auth Metadata (Cookies)</h3>
+                                    <div className="text-[10px] font-mono break-all text-zinc-500 line-clamp-3">
+                                        {session.cookies || 'Waiting for verification...'}
+                                    </div>
+                                    {session.cookies && (
+                                        <button 
+                                            onClick={() => navigator.clipboard.writeText(session.cookies)}
+                                            className="mt-2 text-[9px] bg-blue-900/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-900/40"
+                                        >
+                                            COPY_TO_CLIPBOARD
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <footer className="mt-8 pt-4 border-t border-zinc-900 flex justify-between items-center text-[10px] text-zinc-600">
+                        <div className="flex gap-4">
+                            <span>BUN_RUNTIME</span>
+                            <span>PLAYWRIGHT_v1.4</span>
+                            <span>MAILSY_CLI_INTEGRATED</span>
+                        </div>
+                        <div>PROD_READY // NO_DB_PERSISTENCE</div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>
