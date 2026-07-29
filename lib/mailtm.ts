@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execSync, spawnSync } from 'child_process'
 
 export interface MailsyAccount {
   address: string
@@ -41,39 +41,53 @@ export function createMailsyAccount(): MailsyAccount {
 
 /**
  * Wait for OTP email and extract the code
- * Mailsy CLI maintains session, so it polls the current account
+ * mailsy m is interactive, so we send Ctrl+C to exit after reading output
  * @param timeout - Timeout in milliseconds
  * @returns OTP code if found
  */
 export function waitForMailsyOTP(timeout = 60000): string | null {
   try {
-    // Run: mailsy m (fetch messages from current account)
-    // Note: mailsy CLI persists the account session, so we just poll
     const startTime = Date.now()
     const pollInterval = 3000
 
     while (Date.now() - startTime < timeout) {
       try {
-        const output = execSync('mailsy m', { encoding: 'utf-8' })
+        // Use spawnSync to run mailsy m with stdin input (Ctrl+C to exit)
+        // Send Ctrl+C signal after 1 second to terminate the interactive prompt
+        const result = spawnSync('bash', ['-c', 'timeout 2 mailsy m || true'], {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
 
-        // If output contains "No Emails", continue polling
-        if (output.includes('No Emails')) {
+        const output = result.stdout || ''
+
+        // Check if output contains email list
+        if (!output || output.includes('No Emails') || output.includes('No messages')) {
           const elapsed = Date.now() - startTime
           const remaining = timeout - elapsed
           if (remaining > 0) {
-            // Sleep using native Node.js instead of shell command
-            execSync(`node -e "require('util').promisify(setTimeout)(${Math.min(pollInterval, remaining)})"`)
+            // Wait before polling again
+            const now = Date.now()
+            while (Date.now() - now < Math.min(pollInterval, remaining)) {
+              // Busy wait
+            }
           }
           continue
         }
 
-        // Extract OTP from email content
-        const codeMatch = output.match(/code[=:\s]+(\d{6})/) || output.match(/\b(\d{6})\b/)
+        // Extract OTP code from the email output
+        // Email format in mailsy m output: "293462 is your Vercel sign up code"
+        const codeMatch =
+          output.match(/\b(\d{6})\s+is\s+your/) || // "293462 is your..."
+          output.match(/code[=:\s]+(\d{6})/) || // "code: 123456"
+          output.match(/\b(\d{6})\b/) // Any 6-digit number
+
         if (codeMatch && codeMatch[1]) {
           return codeMatch[1]
         }
       } catch (e) {
         // Continue polling on error
+        console.error('[v0] Mailsy poll error:', e)
       }
 
       const elapsed = Date.now() - startTime
@@ -81,17 +95,16 @@ export function waitForMailsyOTP(timeout = 60000): string | null {
 
       const remaining = timeout - elapsed
       if (remaining > 0) {
-        // Use setTimeout-based sleep
         const now = Date.now()
         while (Date.now() - now < Math.min(pollInterval, remaining)) {
-          // Busy wait - not ideal but works cross-platform
+          // Busy wait
         }
       }
     }
 
     return null
   } catch (error) {
-    console.error('Mailsy OTP extraction error:', error)
+    console.error('[v0] Mailsy OTP extraction error:', error)
     return null
   }
 }
