@@ -4,7 +4,7 @@ import { Log } from '@/app/page'
 
 interface TerminalLogProps {
   logs: Log[]
-  logsEndRef: React.RefObject<HTMLDivElement>
+  logsEndRef: React.RefObject<HTMLDivElement | null>
 }
 
 const LOG_COLORS: Record<Log['level'], string> = {

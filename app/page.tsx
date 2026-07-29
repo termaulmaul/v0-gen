@@ -7,14 +7,14 @@ import TerminalLog from '@/components/TerminalLog'
 import ContextPanels from '@/components/ContextPanels'
 import Footer from '@/components/Footer'
 
-export interface Log {
+export type Log = {
   id: number
   msg: string
   level: 'INFO' | 'OK' | 'CMD' | 'DEBUG' | 'WARN' | 'SYS' | 'ERROR'
   time: string
 }
 
-export interface SessionState {
+export type SessionState = {
   id: string
   email: string | null
   status: 'READY' | 'MAIL_READY' | 'POLLING' | 'CODE_FOUND' | 'VERIFIED' | 'COOKIES_SYNCED' | 'COMPLETED'
