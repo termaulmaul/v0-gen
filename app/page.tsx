@@ -98,16 +98,12 @@ export default function Home() {
 
   const startPoll = async () => {
     addLog('POLL: Checking Mailsy inbox via CLI (timeout: 60s)...', 'SYS')
-    if (!session.email) {
-      addLog('ERR: No email address available', 'ERROR')
-      return
-    }
 
     try {
       const res = await fetch('/api/mail/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: session.email, timeout: 60000 }),
+        body: JSON.stringify({ timeout: 60000 }),
       })
 
       if (!res.ok) throw new Error('Failed to get OTP')
