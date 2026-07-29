@@ -34,7 +34,6 @@ export default function Home() {
   })
 
   const [logs, setLogs] = useState<Log[]>([])
-  const [mailToken, setMailToken] = useState<string | null>(null)
   const logsEndRef = useRef<HTMLDivElement>(null)
 
   const addLog = (msg: string, level: Log['level'] = 'INFO') => {
@@ -74,13 +73,12 @@ export default function Home() {
   }, [session.status, session.auto])
 
   const triggerMail = async () => {
-    addLog('REQ: MailTM account creation...', 'CMD')
+    addLog('REQ: Mailsy account creation via CLI...', 'CMD')
     try {
       const res = await fetch('/api/mail/create', { method: 'POST' })
       if (!res.ok) throw new Error('Failed to create mail account')
 
       const data = await res.json()
-      setMailToken(data.token)
       setSession((s) => ({ ...s, email: data.address, status: 'MAIL_READY' }))
       addLog(`RES: Created ${data.address}`, 'OK')
     } catch (error) {
@@ -99,9 +97,9 @@ export default function Home() {
   }
 
   const startPoll = async () => {
-    addLog('POLL: Checking MailTM inbox (timeout: 60s)...', 'SYS')
-    if (!mailToken) {
-      addLog('ERR: No mail token available', 'ERROR')
+    addLog('POLL: Checking Mailsy inbox via CLI (timeout: 60s)...', 'SYS')
+    if (!session.email) {
+      addLog('ERR: No email address available', 'ERROR')
       return
     }
 
@@ -109,7 +107,7 @@ export default function Home() {
       const res = await fetch('/api/mail/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: mailToken, timeout: 60000 }),
+        body: JSON.stringify({ address: session.email, timeout: 60000 }),
       })
 
       if (!res.ok) throw new Error('Failed to get OTP')
@@ -159,7 +157,6 @@ export default function Home() {
       cookies: null,
       auto: false,
     })
-    setMailToken(null)
     setLogs([])
     addLog('SYS: Workflow reset to IDLE', 'WARN')
   }

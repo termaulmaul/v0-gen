@@ -1,8 +1,8 @@
-import { createMailTMAccount } from '@/lib/mailtm'
+import { createMailsyAccount } from '@/lib/mailtm'
 
 export async function POST() {
   try {
-    const account = await createMailTMAccount()
+    const account = createMailsyAccount()
     return Response.json(account)
   } catch (error) {
     return Response.json(

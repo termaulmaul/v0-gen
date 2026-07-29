@@ -1,120 +1,56 @@
-const API_URL = 'https://api.mail.tm'
+import { execSync } from 'child_process'
 
-export interface MailTMAccount {
+export interface MailsyAccount {
   address: string
-  password: string
-  token: string
 }
 
-function generateRandomString(length = 10): string {
-  const letters = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    result += letters.charAt(Math.floor(Math.random() * letters.length))
-  }
-  return result
-}
-
-export async function getAvailableDomains(): Promise<string[]> {
+/**
+ * Create a new Mailsy temporary email account via CLI
+ * Requires mailsy CLI to be installed: npm install -g mailsy
+ */
+export function createMailsyAccount(): MailsyAccount {
   try {
-    const res = await fetch(`${API_URL}/domains`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    // Run: mailsy account create
+    const output = execSync('mailsy account create --json', { encoding: 'utf-8' })
+    const data = JSON.parse(output)
 
-    const data = await res.json()
-    const domains = Array.isArray(data) ? data : data['hydra:member'] || []
-    return domains.map((d: any) => d.domain).filter(Boolean)
-  } catch (error) {
-    throw new Error(`Failed to fetch domains: ${error}`)
-  }
-}
-
-export async function createMailTMAccount(): Promise<MailTMAccount> {
-  try {
-    const domains = await getAvailableDomains()
-    if (!domains.length) throw new Error('No available domains')
-
-    const domain = domains[0]
-    const address = `${generateRandomString(8)}@${domain}`
-    const password = `Xq9!${generateRandomString(12)}#Z`
-
-    // Create account
-    const createRes = await fetch(`${API_URL}/accounts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, password }),
-    })
-
-    if (!createRes.ok) throw new Error(`Failed to create account: ${createRes.status}`)
-
-    // Get token
-    const tokenRes = await fetch(`${API_URL}/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, password }),
-    })
-
-    if (!tokenRes.ok) throw new Error(`Failed to get token: ${tokenRes.status}`)
-
-    const tokenData = await tokenRes.json()
-    const token = tokenData.token
-
-    return { address, password, token }
-  } catch (error) {
-    throw new Error(`MailTM account creation failed: ${error}`)
-  }
-}
-
-export async function waitForOTP(token: string, timeout = 60000): Promise<string | null> {
-  const startTime = Date.now()
-  const pollInterval = 3000
-
-  while (Date.now() - startTime < timeout) {
-    try {
-      const res = await fetch(`${API_URL}/messages`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-      const data = await res.json()
-      const messages = Array.isArray(data) ? data : data['hydra:member'] || []
-
-      if (messages.length > 0) {
-        const msgId = messages[0].id
-        const otp = await extractOTP(token, msgId)
-        if (otp) return otp
-      }
-    } catch (error) {
-      console.error('Poll error:', error)
+    if (!data.address) {
+      throw new Error('No email address returned from Mailsy')
     }
 
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+    return { address: data.address }
+  } catch (error) {
+    throw new Error(`Mailsy account creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
-
-  return null
 }
 
-async function extractOTP(token: string, msgId: string): Promise<string | null> {
+/**
+ * Wait for OTP email and extract the code
+ * @param address - Mailsy email address
+ * @param timeout - Timeout in milliseconds
+ * @returns OTP code if found
+ */
+export function waitForMailsyOTP(address: string, timeout = 60000): string | null {
   try {
-    const res = await fetch(`${API_URL}/messages/${msgId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    })
+    // Run: mailsy inbox read --address <address> --wait <timeout> --json
+    const timeoutSeconds = Math.ceil(timeout / 1000)
+    const output = execSync(
+      `mailsy inbox read --address "${address}" --wait ${timeoutSeconds} --json`,
+      { encoding: 'utf-8' }
+    )
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const emails = JSON.parse(output)
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return null
+    }
 
-    const data = await res.json()
-    const content = data.text || ''
+    // Extract OTP from first email
+    const emailContent = emails[0].body || emails[0].text || ''
+    const match = emailContent.match(/code=(\d{6})/) || emailContent.match(/\b(\d{6})\b/)
 
-    const match = content.match(/code=(\d{6})/) || content.match(/\b(\d{6})\b/)
     return match ? match[1] : null
   } catch (error) {
-    console.error('Extract OTP error:', error)
+    console.error('Mailsy OTP extraction error:', error)
     return null
   }
 }
