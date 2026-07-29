@@ -1,16 +1,23 @@
-# Vercel Auth Automator - Playwright + Mailsy Workflow
+# Vercel v0 Signup Automation - Fully Automatic
 
-This app automates Vercel v0 signup using Playwright for browser automation + Mailsy CLI for temp email. Run locally on macOS only.
+Automates complete Vercel v0 signup workflow using Playwright Chrome + Mailsy CLI. Completely hands-off once started.
 
 ## Prerequisites
 
+Install Mailsy CLI globally:
+
 ```bash
-# Install Mailsy CLI
+# Via npm
 npm install -g mailsy
 
-# Verify Mailsy works
-mailsy --version
-mailsy me  # Check current account
+# Or via bun
+bun add -g mailsy
+
+# Or via pnpm
+pnpm add -g mailsy
+
+# Verify installation
+mailsy --help
 ```
 
 ## Installation
@@ -21,69 +28,51 @@ pnpm install
 pnpm exec playwright install chromium
 ```
 
-## Complete Workflow (Two Terminals)
+## Run Locally (Fully Automatic)
 
-### Terminal 1: Start Dev Server
+### Single Terminal
 
 ```bash
-npm run dev  # or: bun run dev
+npm run dev
 ```
 
 Opens http://localhost:3000
 
-### Terminal 2: Ready for Manual OTP Extraction
-
-Keep this terminal open. When the webapp shows "Waiting for OTP", you'll run `mailsy m` here.
-
-### Browser: Enable Autopilot
+### Browser: Click AUTO-PILOT
 
 1. Open http://localhost:3000
-2. Click **AUTO-PILOT** toggle to start
+2. Click **AUTO-PILOT** toggle
+3. Watch the fully automated workflow execute:
 
-**Playwright automation will automatically:**
-- Launch Chrome browser (visible on screen)
+**Automatically will:**
+- Create temporary Mailsy email (e.g., `7iyzuo@web-library.net`)
+- Launch visible Chrome browser
 - Navigate to `https://vercel.com/signup/v0`
-- Auto-fill your Mailsy email address
-- Click "Continue with Email" button
-- Wait for OTP input screen
-
-**Terminal log will show:**
-```
-[BROWSER: BROWSER] Launching Chromium...
-[BROWSER: NAV] Navigating to https://vercel.com/signup/v0...
-[BROWSER: INPUT] Filling email field with: abc123@web-library.net
-[BROWSER: CLICK] Continue button clicked
-[BROWSER: WAIT] OTP input appeared
-[MAILSY] Run "mailsy m" in your macOS terminal to extract OTP
-[MAILSY] Copy the 6-digit code (e.g., 255578 from email subject)
-```
-
-### Manual: Extract OTP from Mailsy
-
-When you see the "Run mailsy m" message in the webapp terminal:
-
-**In Terminal 2, run:**
-```bash
-mailsy m
-```
-
-**You'll see output like:**
-```
-? Select an email
-  1. Some promotional email - From: sender@example.com
-❯ 2. 255578 is your Vercel sign up code - From: registration@vercel.com
-  3. Another email
-```
-
-The OTP code (e.g., `255578`) is shown in the email subject line.
-
-### Browser: Submit OTP
-
-The webapp is waiting for the OTP. The workflow will:
-- Display the OTP input screen in Playwright Chrome
-- Auto-fill the 6-digit code
+- Auto-fill your email
+- Click "Continue with Email"
+- Wait for verification email
+- **Extract 6-digit OTP automatically** (3-5 seconds)
+- Fill OTP into browser
 - Submit verification
-- Capture auth cookies
+- Capture authentication cookies
+
+**Terminal log shows real-time progress:**
+```
+[11:30:45] REQ: Mailsy account creation via CLI...
+[11:30:46] RES: Created 7iyzuo@web-library.net
+[11:30:47] REQ: Launching Playwright browser context...
+[11:30:50] BROWSER: Chrome launched
+[11:30:55] BROWSER: Navigating to https://vercel.com/signup/v0
+[11:31:00] BROWSER: Email filled and button clicked
+[11:31:03] POLL: Checking Mailsy inbox for OTP (timeout: 60s)...
+[11:31:06] RES: OTP extracted -> 255578
+[11:31:15] REQ: Injecting 255578 to browser...
+[11:31:20] RES: OTP verification submitted
+[11:31:22] RES: Cookies cached to session
+[11:31:25] RES: CLI Auth Complete
+```
+
+**Total time: ~45-60 seconds** from start to complete signup
 
 ## What Gets Captured
 
@@ -113,25 +102,56 @@ The webapp is waiting for the OTP. The workflow will:
 - `[CMD]` - CLI command execution
 - `[SYS]` - System event
 
+## Workflow Stages
+
+1. **Mailsy Account Creation** - Creates temporary email via `mailsy d && mailsy g`
+2. **Browser Launch** - Playwright launches Chrome with Vercel signup page
+3. **Email Auto-Fill** - Fills email and clicks "Continue with Email"
+4. **OTP Poll** - Polls Mailsy inbox automatically, extracts 6-digit code
+5. **OTP Verification** - Fills OTP and submits to Vercel
+6. **Cookie Capture** - Extracts auth cookies to **AUTH METADATA** panel
+7. **Completion** - Workflow finished, ready to use
+
+## Cookie Export
+
+All cookies captured and displayed in **AUTH METADATA (COOKIES)** section:
+
+- Click **📋 COPY_COOKIES_JSON** to copy all cookies as JSON array
+- Format includes all properties: domain, expiration, httpOnly, sameSite, secure, value, etc.
+- Ready to use with curl, requests, or Vercel CLI
+
 ## Troubleshooting
 
-**Chrome doesn't open:**
-- Verify Playwright installed: `pnpm exec playwright install chromium`
-- Check macOS has Chrome/Chromium available
+**"Playwright browser failed to launch"**
+- Running in cloud? This requires local macOS with Chrome
+- Verify: `pnpm exec playwright install chromium`
 
-**Mailsy m shows "No Emails":**
-- Email may not have arrived yet, wait 5-10 seconds
-- Run again: `mailsy m`
-- Check your spam folder
+**"No OTP found in email (timeout)"**
+- Verification email didn't arrive within 60 seconds
+- Possible causes: Vercel rate-limiting, network issue
+- Try again with new email
 
-**OTP not auto-filling:**
-- Check Chrome window - it may be behind other windows
-- Manually enter the 6-digit code you see in `mailsy m` output
-- Refresh and try again
+**Chrome window doesn't show**
+- Chrome may be behind terminal window
+- Alt+Tab to find it or minimize terminal
+- Ensure Playwright has display access
 
-**Build errors:**
+**Build fails**
 ```bash
 pnpm clean
 pnpm install
 pnpm build
+```
+
+**Mailsy CLI issues**
+```bash
+# Check installation
+which mailsy
+mailsy --version
+
+# Test manually
+mailsy d && mailsy g  # Delete + create account
+mailsy m              # List emails
+mailsy me             # Show account details
+mailsy d              # Delete account
 ```

@@ -1,59 +1,93 @@
-# Quick Start - 60 Seconds
+# Quick Start - Fully Automatic
 
 ## Setup (One Time)
 
 ```bash
+# Install Mailsy CLI globally
 npm install -g mailsy
+
+# Install project dependencies
 pnpm install
+
+# Install Playwright browsers
 pnpm exec playwright install chromium
 ```
 
-## Run
+## Run (Single Terminal)
 
-**Terminal 1:**
 ```bash
 npm run dev
 ```
 
-**Terminal 2:**
+Open http://localhost:3000 and click **AUTO-PILOT** → Done! ✓
+
+---
+
+## What Happens
+
+```
+[11:30:45] REQ: Mailsy account creation via CLI...
+[11:30:46] RES: Created 7iyzuo@web-library.net
+
+[11:30:47] REQ: Launching Playwright browser context...
+[11:30:50] BROWSER: Chrome launched successfully
+[11:30:55] BROWSER: Navigating to https://vercel.com/signup/v0
+[11:31:00] BROWSER: Email filled and button clicked
+
+[11:31:03] POLL: Checking Mailsy inbox for OTP (timeout: 60s)...
+[11:31:06] RES: OTP extracted -> 255578
+
+[11:31:15] REQ: Injecting 255578 to browser...
+[11:31:20] RES: OTP verification submitted
+[11:31:22] RES: Cookies cached to session
+[11:31:25] RES: CLI Auth Complete
+```
+
+**Total: 45-60 seconds** - All automatic, no manual steps needed!
+
+---
+
+## Get Cookies
+
+Scroll to **AUTH METADATA (COOKIES)** panel → Click **📋 COPY_COOKIES_JSON**
+
+```json
+[
+  {
+    "name": "anon_session_id",
+    "value": "Wu8oJqHJJeVBc7utmR8ctZpcRmu1Mhq0",
+    "domain": "v0.app",
+    "httpOnly": false,
+    "secure": false
+  },
+  {
+    "name": "user_session",
+    "value": "eyJhbGciOiJkaXI...",
+    "domain": "v0.app",
+    "httpOnly": true,
+    "secure": true
+  }
+]
+```
+
+---
+
+## Troubleshooting
+
+| Error | Fix |
+|-------|-----|
+| Chrome not opening | `pnpm exec playwright install chromium` |
+| Mailsy not found | `npm install -g mailsy` |
+| No OTP in 60s | Try again (Vercel may rate-limit) |
+| Build fails | `pnpm clean && pnpm install` |
+
+---
+
+## Manual Mailsy (Optional Testing)
+
 ```bash
-# Keep ready - will use later for: mailsy m
+mailsy d && mailsy g    # Delete old + create new account
+mailsy me               # Show current account details
+mailsy m                # List emails in inbox
+mailsy d                # Delete account
 ```
-
-**Browser:**
-1. Open http://localhost:3000
-2. Click AUTO-PILOT toggle
-3. Watch Chrome browser open and navigate to Vercel signup
-4. Chrome will auto-fill your Mailsy email and click "Continue with Email"
-
-## When "Waiting for OTP" appears in webapp terminal
-
-**Terminal 2:**
-```bash
-mailsy m
-```
-
-**Copy the 6-digit code** from email subject (e.g., "255578 is your Vercel sign up code")
-
-**App will auto-fill and submit OTP** → Cookies captured in "Auth Metadata" section
-
-## Output
-
-```
-STD_OUT // RECOVERY_LOG
-[BROWSER: BROWSER] Launching Chromium...
-[BROWSER: NAV] Navigating to https://vercel.com/signup/v0...
-[BROWSER: INPUT] Filling email field with: abc123@web-library.net
-[BROWSER: CLICK] Continue button clicked
-[MAILSY] Run "mailsy m" in your macOS terminal to extract OTP
-[MAILSY] Copy the 6-digit code (e.g., 255578 from email subject)
-→ Run mailsy m now ↓
-[BROWSER: WAIT] OTP input appeared
-[BROWSER: OTP] Filling OTP code: 255578
-[BROWSER: OTP] Verification complete
-[OK] Auth cookies captured
-```
-
-## Copy Cookies
-
-Scroll down to "Auth Metadata (Cookies)" section → Click **📋 COPY_COOKIES_JSON** button
