@@ -6,25 +6,13 @@ export interface MailsyAccount {
 
 /**
  * Create a new Mailsy temporary email account via CLI
+ * Deletes any existing account, then generates fresh one
  * Requires mailsy CLI to be installed: npm install -g mailsy
  */
 export function createMailsyAccount(): MailsyAccount {
   try {
-    // First, try to delete any existing account
-    try {
-      execSync('mailsy d', { encoding: 'utf-8' })
-    } catch (e) {
-      // Ignore delete errors (no account to delete is fine)
-    }
-
-    // Small delay to ensure delete completed
-    const now = Date.now()
-    while (Date.now() - now < 500) {
-      // Busy wait
-    }
-
-    // Now create a new account: mailsy g (generate new account)
-    const output = execSync('mailsy g', { encoding: 'utf-8' })
+    // Delete existing account and generate new one in single command
+    const output = execSync('mailsy d && mailsy g', { encoding: 'utf-8' })
 
     // Parse output: "Account created: email@domain.net"
     const match = output.match(/Account created:\s*(\S+@\S+)/)
