@@ -140,7 +140,9 @@ export default function Home() {
   }
 
   const startPoll = async () => {
-    addLog('POLL: Checking Mailsy inbox via CLI (timeout: 60s)...', 'SYS')
+    addLog('POLL: Waiting for OTP from Vercel signup...', 'SYS')
+    addLog('MAILSY: Run "mailsy m" in your macOS terminal to extract OTP', 'WARN')
+    addLog('MAILSY: Copy the 6-digit code (e.g., 255578 from email subject)', 'WARN')
 
     try {
       const res = await fetch('/api/mail/otp', {
@@ -156,12 +158,12 @@ export default function Home() {
         setSession((s) => ({ ...s, code: data.otp, status: 'CODE_FOUND' }))
         addLog(`RES: OTP extracted -> ${data.otp}`, 'OK')
       } else {
-        addLog('ERR: No OTP found in email', 'ERROR')
-        setSession((s) => ({ ...s, auto: false }))
+        addLog('INFO: No OTP found yet - check mailsy m output and enter manually', 'INFO')
+        addLog('MAILSY: If you have the OTP code, submit it to verify', 'WARN')
+        // Don't stop autopilot, allow manual OTP entry
       }
     } catch (error) {
-      addLog(`ERR: ${error instanceof Error ? error.message : 'OTP polling failed'}`, 'ERROR')
-      setSession((s) => ({ ...s, auto: false }))
+      addLog(`INFO: ${error instanceof Error ? error.message : 'OTP polling'}`, 'INFO')
     }
   }
 
