@@ -34,6 +34,7 @@ export default function Home() {
   })
 
   const [logs, setLogs] = useState<Log[]>([])
+  const [mailToken, setMailToken] = useState<string | null>(null)
   const logsEndRef = useRef<HTMLDivElement>(null)
 
   const addLog = (msg: string, level: Log['level'] = 'INFO') => {
@@ -73,11 +74,19 @@ export default function Home() {
   }, [session.status, session.auto])
 
   const triggerMail = async () => {
-    addLog('REQ: Mailsy mailbox creation...', 'CMD')
-    await new Promise((r) => setTimeout(r, 1200))
-    const mail = `user_${Math.random().toString(36).substring(7)}@mailsy.com`
-    setSession((s) => ({ ...s, email: mail, status: 'MAIL_READY' }))
-    addLog(`RES: Created ${mail}`, 'OK')
+    addLog('REQ: MailTM account creation...', 'CMD')
+    try {
+      const res = await fetch('/api/mail/create', { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to create mail account')
+
+      const data = await res.json()
+      setMailToken(data.token)
+      setSession((s) => ({ ...s, email: data.address, status: 'MAIL_READY' }))
+      addLog(`RES: Created ${data.address}`, 'OK')
+    } catch (error) {
+      addLog(`ERR: ${error instanceof Error ? error.message : 'Mail creation failed'}`, 'ERROR')
+      setSession((s) => ({ ...s, auto: false }))
+    }
   }
 
   const triggerSignup = async () => {
@@ -89,19 +98,34 @@ export default function Home() {
     setSession((s) => ({ ...s, status: 'POLLING' }))
   }
 
-  const startPoll = () => {
-    addLog('POLL: Checking Mailsy inbox (2s interval)...', 'SYS')
-    let attempts = 0
-    const timer = setInterval(() => {
-      attempts++
-      addLog(`POLL: Attempt ${attempts}...`, 'DEBUG')
-      if (attempts >= 3) {
-        clearInterval(timer)
-        const code = Math.floor(100000 + Math.random() * 900000).toString()
-        setSession((s) => ({ ...s, code, status: 'CODE_FOUND' }))
-        addLog(`RES: Code extracted -> ${code}`, 'OK')
+  const startPoll = async () => {
+    addLog('POLL: Checking MailTM inbox (timeout: 60s)...', 'SYS')
+    if (!mailToken) {
+      addLog('ERR: No mail token available', 'ERROR')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/mail/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: mailToken, timeout: 60000 }),
+      })
+
+      if (!res.ok) throw new Error('Failed to get OTP')
+
+      const data = await res.json()
+      if (data.otp) {
+        setSession((s) => ({ ...s, code: data.otp, status: 'CODE_FOUND' }))
+        addLog(`RES: OTP extracted -> ${data.otp}`, 'OK')
+      } else {
+        addLog('ERR: No OTP found in email', 'ERROR')
+        setSession((s) => ({ ...s, auto: false }))
       }
-    }, 2000)
+    } catch (error) {
+      addLog(`ERR: ${error instanceof Error ? error.message : 'OTP polling failed'}`, 'ERROR')
+      setSession((s) => ({ ...s, auto: false }))
+    }
   }
 
   const triggerVerify = async () => {
@@ -135,6 +159,7 @@ export default function Home() {
       cookies: null,
       auto: false,
     })
+    setMailToken(null)
     setLogs([])
     addLog('SYS: Workflow reset to IDLE', 'WARN')
   }
