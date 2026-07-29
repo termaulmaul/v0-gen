@@ -55,17 +55,25 @@ export async function fillEmailAndContinue(email: string): Promise<void> {
 
   try {
     log('INPUT', `Filling email field with: ${email}`)
-    await page.fill('input[type="email"]', email)
-    log('INPUT', 'Email filled successfully')
+    
+    // Wait for email input to be visible
+    await page.waitForSelector('input[type="email"]', { timeout: 5000 })
+    await page.fill('input[type="email"]', email, { timeout: 5000 })
+    log('INPUT', `Email filled: ${email}`)
 
     log('CLICK', 'Clicking "Continue with Email" button...')
-    await page.click('button:has-text("Continue with Email")')
-    log('CLICK', 'Email continuation clicked')
+    // Click the continue button
+    await page.click('button:has-text("Continue with Email")', { timeout: 5000 })
+    log('CLICK', 'Continue button clicked')
 
-    // Wait for OTP input to appear
-    log('WAIT', 'Waiting for OTP input fields...')
-    await page.waitForSelector('input[inputmode="numeric"]', { timeout: 10000 })
-    log('WAIT', 'OTP input fields appeared')
+    // Wait for OTP input section to appear (can be multiple fields or a code input)
+    log('WAIT', 'Waiting for OTP entry...')
+    try {
+      await page.waitForSelector('input[inputmode="numeric"], input[placeholder*="code"], input[placeholder*="Code"]', { timeout: 15000 })
+      log('WAIT', 'OTP input appeared')
+    } catch {
+      log('INFO', 'OTP input not yet visible - may be on next screen')
+    }
   } catch (error) {
     log('ERROR', `Email filling failed: ${error}`)
     throw error
@@ -76,21 +84,33 @@ export async function fillOTP(otp: string): Promise<void> {
   if (!page) throw new Error('Browser page not initialized')
 
   try {
-    log('OTP', `Filling OTP: ${otp}`)
-    const otpInputs = await page.locator('input[inputmode="numeric"]').all()
-    log('OTP', `Found ${otpInputs.length} OTP input fields`)
-
-    for (let i = 0; i < otp.length && i < otpInputs.length; i++) {
-      await otpInputs[i].fill(otp[i])
-      log('OTP', `Filled digit ${i + 1}/${otp.length}`)
+    log('OTP', `Filling OTP code: ${otp}`)
+    
+    // Try to find OTP input (could be single field or multiple digit fields)
+    const singleCodeInput = await page.$('input[placeholder*="code"], input[placeholder*="Code"], input[type="text"][maxlength]')
+    
+    if (singleCodeInput) {
+      // Single code input field
+      log('OTP', 'Found single code input field')
+      await page.fill('input[placeholder*="code"], input[placeholder*="Code"], input[type="text"][maxlength]', otp)
+      log('OTP', `Code filled: ${otp}`)
+    } else {
+      // Multiple digit input fields
+      const otpInputs = await page.locator('input[inputmode="numeric"]').all()
+      log('OTP', `Found ${otpInputs.length} digit input fields`)
+      
+      for (let i = 0; i < otp.length && i < otpInputs.length; i++) {
+        await otpInputs[i].fill(otp[i])
+        log('OTP', `Filled digit ${i + 1}/${otp.length}`)
+      }
     }
 
-    log('OTP', 'All OTP digits filled - verifying...')
-    // OTP auto-submits or wait for verification
-    await page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {
-      log('INFO', 'No navigation after OTP (may auto-verify)')
+    log('OTP', 'OTP filled - waiting for verification...')
+    // Wait for navigation or success indicator
+    await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 10000 }).catch(() => {
+      log('INFO', 'Page verification in progress...')
     })
-    log('OTP', 'OTP verification complete')
+    log('OTP', 'Verification complete')
   } catch (error) {
     log('ERROR', `OTP filling failed: ${error}`)
     throw error

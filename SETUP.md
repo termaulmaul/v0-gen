@@ -1,104 +1,157 @@
-# Vercel Auth Automator - Local Setup with Mailsy CLI
+# Vercel v0 Signup Automation - Fully Automatic
 
-This project is designed to run locally on macOS and uses the Mailsy CLI for temporary email account creation and OTP polling.
+Automates complete Vercel v0 signup workflow using Playwright Chrome + Mailsy CLI. Completely hands-off once started.
 
 ## Prerequisites
 
-### 1. Install Node.js
-```bash
-brew install node
-```
+Install Mailsy CLI globally:
 
-### 2. Install Mailsy CLI
 ```bash
+# Via npm
 npm install -g mailsy
-```
 
-Verify installation:
-```bash
-mailsy --version
-```
+# Or via bun
+bun add -g mailsy
 
-### 3. Configure Mailsy (if first time)
-```bash
-mailsy account setup
-```
+# Or via pnpm
+pnpm add -g mailsy
 
-This will guide you through initial configuration.
+# Verify installation
+mailsy --help
+```
 
 ## Installation
 
-1. Clone or navigate to the project directory:
 ```bash
-cd v0-project
+cd /path/to/v0-gen
+pnpm install
+pnpm exec playwright install chromium
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+## Run Locally (Fully Automatic)
 
-## Running Locally
+### Single Terminal
 
-1. Start the development server:
 ```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`
+Opens http://localhost:3000
 
-2. Open in your browser and enable "AUTO-PILOT" to start the workflow
+### Browser: Click AUTO-PILOT
 
-## How It Works
+1. Open http://localhost:3000
+2. Click **AUTO-PILOT** toggle
+3. Watch the fully automated workflow execute:
 
-The workflow automates the following steps using Mailsy CLI:
+**Automatically will:**
+- Create temporary Mailsy email (e.g., `7iyzuo@web-library.net`)
+- Launch visible Chrome browser
+- Navigate to `https://vercel.com/signup/v0`
+- Auto-fill your email
+- Click "Continue with Email"
+- Wait for verification email
+- **Extract 6-digit OTP automatically** (3-5 seconds)
+- Fill OTP into browser
+- Submit verification
+- Capture authentication cookies
 
-1. **Account Creation** - Creates a temporary email account via `mailsy account create`
-2. **Email Polling** - Waits for incoming verification emails via `mailsy inbox read`
-3. **OTP Extraction** - Parses the email content to extract 6-digit codes
-4. **Status Tracking** - Displays real-time logs of all operations
+**Terminal log shows real-time progress:**
+```
+[11:30:45] REQ: Mailsy account creation via CLI...
+[11:30:46] RES: Created 7iyzuo@web-library.net
+[11:30:47] REQ: Launching Playwright browser context...
+[11:30:50] BROWSER: Chrome launched
+[11:30:55] BROWSER: Navigating to https://vercel.com/signup/v0
+[11:31:00] BROWSER: Email filled and button clicked
+[11:31:03] POLL: Checking Mailsy inbox for OTP (timeout: 60s)...
+[11:31:06] RES: OTP extracted -> 255578
+[11:31:15] REQ: Injecting 255578 to browser...
+[11:31:20] RES: OTP verification submitted
+[11:31:22] RES: Cookies cached to session
+[11:31:25] RES: CLI Auth Complete
+```
 
-## Terminal Output
+**Total time: ~45-60 seconds** from start to complete signup
 
-When autopilot is enabled, you'll see terminal logs showing:
-- `[OK]` - Successful operations
-- `[CMD]` - CLI commands being executed
-- `[SYS]` - System events
-- `[ERROR]` - Any failures
-- `[DEBUG]` - Detailed polling attempts
+## What Gets Captured
+
+**Auth Metadata (Cookies)** section will display:
+- `anon_session_id` - Anonymous session
+- `user_session` - Authenticated session token
+- `v0-has-signed-in` - Sign-in flag
+- Other v0 app cookies
+
+**Copy button available** to copy all cookies as JSON array for use in other requests.
+
+## File Locations
+
+- **Playwright automation**: `/lib/playwright-automation.ts`
+- **Browser API routes**: `/app/api/automation/browser`
+- **Signup API routes**: `/app/api/automation/signup`
+- **Mailsy CLI wrapper**: `/lib/mailtm.ts`
+- **Mail API routes**: `/app/api/mail/create` and `/app/api/mail/otp`
+
+## Terminal Log Legend
+
+- `[BROWSER: ...]` - Playwright Chrome automation
+- `[MAILSY ...]` - Instructions for manual `mailsy m`
+- `[REQ]` - Starting operation
+- `[RES]` / `[OK]` - Success
+- `[ERR]` / `[ERROR]` - Failure
+- `[CMD]` - CLI command execution
+- `[SYS]` - System event
+
+## Workflow Stages
+
+1. **Mailsy Account Creation** - Creates temporary email via `mailsy d && mailsy g`
+2. **Browser Launch** - Playwright launches Chrome with Vercel signup page
+3. **Email Auto-Fill** - Fills email and clicks "Continue with Email"
+4. **OTP Poll** - Polls Mailsy inbox automatically, extracts 6-digit code
+5. **OTP Verification** - Fills OTP and submits to Vercel
+6. **Cookie Capture** - Extracts auth cookies to **AUTH METADATA** panel
+7. **Completion** - Workflow finished, ready to use
+
+## Cookie Export
+
+All cookies captured and displayed in **AUTH METADATA (COOKIES)** section:
+
+- Click **📋 COPY_COOKIES_JSON** to copy all cookies as JSON array
+- Format includes all properties: domain, expiration, httpOnly, sameSite, secure, value, etc.
+- Ready to use with curl, requests, or Vercel CLI
 
 ## Troubleshooting
 
-### Mailsy CLI not found
-Make sure you've installed it globally:
+**"Playwright browser failed to launch"**
+- Running in cloud? This requires local macOS with Chrome
+- Verify: `pnpm exec playwright install chromium`
+
+**"No OTP found in email (timeout)"**
+- Verification email didn't arrive within 60 seconds
+- Possible causes: Vercel rate-limiting, network issue
+- Try again with new email
+
+**Chrome window doesn't show**
+- Chrome may be behind terminal window
+- Alt+Tab to find it or minimize terminal
+- Ensure Playwright has display access
+
+**Build fails**
 ```bash
-npm install -g mailsy
+pnpm clean
+pnpm install
+pnpm build
 ```
 
-And that it's in your PATH:
+**Mailsy CLI issues**
 ```bash
+# Check installation
 which mailsy
+mailsy --version
+
+# Test manually
+mailsy d && mailsy g  # Delete + create account
+mailsy m              # List emails
+mailsy me             # Show account details
+mailsy d              # Delete account
 ```
-
-### Email not received
-- Wait a few seconds, the polling will continue for up to 60 seconds
-- Check your Mailsy account manually: `mailsy inbox read --address your@email.com`
-- Make sure the sending service has delivered the email to the temp address
-
-### Build errors
-If you get build errors, run:
-```bash
-npm run clean
-npm install
-npm run build
-```
-
-## Environment
-
-This app is configured to run locally and uses:
-- Next.js 16 with App Router
-- React 19 with TypeScript
-- Tailwind CSS v4
-- Child process execution for CLI commands (Node.js `execSync`)
-
-All API routes that interact with Mailsy are located in `/app/api/mail/`

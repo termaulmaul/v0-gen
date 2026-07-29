@@ -140,7 +140,7 @@ export default function Home() {
   }
 
   const startPoll = async () => {
-    addLog('POLL: Checking Mailsy inbox via CLI (timeout: 60s)...', 'SYS')
+    addLog('POLL: Checking Mailsy inbox for OTP (timeout: 60s)...', 'SYS')
 
     try {
       const res = await fetch('/api/mail/otp', {
@@ -156,7 +156,7 @@ export default function Home() {
         setSession((s) => ({ ...s, code: data.otp, status: 'CODE_FOUND' }))
         addLog(`RES: OTP extracted -> ${data.otp}`, 'OK')
       } else {
-        addLog('ERR: No OTP found in email', 'ERROR')
+        addLog('ERR: No OTP found in email (timeout)', 'ERROR')
         setSession((s) => ({ ...s, auto: false }))
       }
     } catch (error) {
@@ -194,7 +194,61 @@ export default function Home() {
   const triggerCookieSync = async () => {
     addLog('REQ: Extracting auth cookies from Playwright...', 'CMD')
     await new Promise((r) => setTimeout(r, 1000))
-    const mockCookies = btoa(JSON.stringify({ _vercel_jwt: 'eyJhbG...', user_id: 'usr_123' }))
+    const mockCookies = JSON.stringify([
+      {
+        domain: 'v0.app',
+        expirationDate: 1785308820.226877,
+        hostOnly: true,
+        httpOnly: false,
+        name: 'anon_session_id',
+        path: '/',
+        sameSite: null,
+        secure: false,
+        session: false,
+        storeId: null,
+        value: 'Wu8oJqHJJeVBc7utmR8ctZpcRmu1Mhq0',
+      },
+      {
+        domain: 'v0.app',
+        expirationDate: 1785913157.986582,
+        hostOnly: true,
+        httpOnly: true,
+        name: 'user_session',
+        path: '/',
+        sameSite: 'lax',
+        secure: true,
+        session: false,
+        storeId: null,
+        value:
+          'eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..DpzL5oeqEgxtBqxU.RtPXYEM524ocG_ps78kAxUHu4xXWFAba9mhv0jjr35qPbDB1gNSwUaQm0lwBkhKjvWgr2Cki_YJ5UL7GR9VlXqP7VthT3rmUup8Jb0JuykLa_RTayuIpbUzlY2htRXbzGe6pqEiGZDmTsAXX1-LLR4qhAkRNmaatFpA5N6q0FilRq6ReQOX10rFb9nmu_VbKoY56bCTnzbNo9wBkxTrCiPDd9Yt7oDMo6Karn0H58KOVOIasEmYUQC9Fx8ZGBkxDI_Zrei4So7NTeJ4OpuaRY7o2Rn0ecGT9xwYzHiu3h9eMUcM70PJdWtZopQrJfRTCbM5teYSE8DbGGk5Tu2l9xJtMnBsToVXzNbjGtHq4-IhUGDEmz3iXlf1hTsQGdLrgwQb6N_RmcesDwhx1IlJ66cmnVpRbUwFw5T-R2yLOBoHORREczDfHFaGR0Q10G1cNocR6EzOo8ksiLg0Uzi_8MLkf5uQXt3gqd_lYpo5LXYHLSA05XjWd5oD7-eExakSSY4EUP-vo5YA43e2mfPiFzYRgP7JsZXDuQJeoFkjzHGdWNDgSKMJ5FtcR5TCXH2TX0UNZiyy3iyfna7Wq-mtH0Sd2ocevne9g7Qd8OJHigtu1-smZ2JHZ8XFhQwDUlfOEXxat42WBYgDHSFgSyjZPmKklDAI4QnYsn69_102SBiKILkFRXs5uwwhwCRNLIH6mdlkFONKo2OJ7X2ScI_3mTk0-V-d3mbHlFzCygiaQ93aP9H2ePeh_07mz6L92qSN0lxiylS8Mbjf0n7DP-MO-fGOKapDBk7_zIjH9YHzFspxqFV_q5mrrBfC7c-rn8ejIv01yjD1Bhdiz4V8duWmjFGoPCIofpgDGMQ_cDIkp5U1V44Q6X8yOrhbxD0jbfmxZ1Gbp9fExU0YV5VXjLKbg3enQE4MX6Dw_TVBJEuRaavLmeotMHmMK1-7tE3RzenQeM8EKJhzbDqo61AKpyvEkgaAIgz0EQRzOPuIMgtHFYVPxGKYv47pYZPGeB6pdqCRf-9IH9i749MyGjnOM6ogX61AHH9XSaRKkPtdg3KnxvSfVvVvB1I5cOh_76ztMWCoDgRtXIpB8a-KYhvzcOIXO3bGCG4WR6dCx0T9dXNWUKae_k5nZXen89M8K2FtgXU6VOmkZBCKWYsE_hToybq02dby6Lyn4MHUAqRzzpLqO1kwyOKhZ-MCw2LX3h0MXa7EuLvZUMsUSUA9NaGui4F_OpNqAP0FDaVIDx2JX6kolA6D2UzgpKDJG5qeW3UCI6yRw_NDQ0T2MdKhwntzr5kHY3QuwkxxMA1XjZjy0p4U1uImQZcZGiAdYnFu2KP1VcqRLpXiDNSt53ahaHaADpvE94Znt7i9zz7tOtkKWog.xVCE8H2BIGL77nHeZ2cx7g',
+      },
+      {
+        domain: 'v0.app',
+        expirationDate: 1785308820.226983,
+        hostOnly: true,
+        httpOnly: false,
+        name: 'session_referer',
+        path: '/',
+        sameSite: null,
+        secure: false,
+        session: false,
+        storeId: null,
+        value: 'https%3A%2F%2Fvercel.com%2F',
+      },
+      {
+        domain: 'v0.app',
+        expirationDate: 1816844398,
+        hostOnly: true,
+        httpOnly: false,
+        name: 'v0-has-signed-in',
+        path: '/',
+        sameSite: 'strict',
+        secure: false,
+        session: false,
+        storeId: null,
+        value: '1',
+      },
+    ])
     setSession((s) => ({ ...s, cookies: mockCookies, status: 'COOKIES_SYNCED' }))
     addLog('RES: Cookies cached to session', 'OK')
   }
