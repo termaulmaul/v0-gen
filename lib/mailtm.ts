@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execSync, spawnSync } from 'child_process'
 
 export interface MailsyAccount {
   address: string
@@ -6,19 +6,22 @@ export interface MailsyAccount {
 
 /**
  * Create a new Mailsy temporary email account via CLI
+ * Deletes any existing account, then generates fresh one
  * Requires mailsy CLI to be installed: npm install -g mailsy
  */
 export function createMailsyAccount(): MailsyAccount {
   try {
-    // Run: mailsy account create
-    const output = execSync('mailsy account create --json', { encoding: 'utf-8' })
-    const data = JSON.parse(output)
+    // Delete existing account and generate new one in single command
+    const output = execSync('mailsy d && mailsy g', { encoding: 'utf-8' })
 
-    if (!data.address) {
-      throw new Error('No email address returned from Mailsy')
+    // Parse output: "Account created: email@domain.net"
+    const match = output.match(/Account created:\s*(\S+@\S+)/)
+    if (!match || !match[1]) {
+      throw new Error('Could not parse email address from Mailsy output')
     }
 
-    return { address: data.address }
+    const address = match[1].trim()
+    return { address }
   } catch (error) {
     throw new Error(`Mailsy account creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
@@ -26,31 +29,75 @@ export function createMailsyAccount(): MailsyAccount {
 
 /**
  * Wait for OTP email and extract the code
- * @param address - Mailsy email address
+ * mailsy m shows interactive menu with email list. Parse OTP from list without selecting.
  * @param timeout - Timeout in milliseconds
  * @returns OTP code if found
  */
-export function waitForMailsyOTP(address: string, timeout = 60000): string | null {
+export function waitForMailsyOTP(timeout = 60000): string | null {
   try {
-    // Run: mailsy inbox read --address <address> --wait <timeout> --json
-    const timeoutSeconds = Math.ceil(timeout / 1000)
-    const output = execSync(
-      `mailsy inbox read --address "${address}" --wait ${timeoutSeconds} --json`,
-      { encoding: 'utf-8' }
-    )
+    const startTime = Date.now()
+    const pollInterval = 3000
 
-    const emails = JSON.parse(output)
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return null
+    while (Date.now() - startTime < timeout) {
+      try {
+        // Run mailsy m with timeout to capture the email list menu output
+        const result = spawnSync('bash', ['-c', 'timeout 2 mailsy m 2>&1 || true'], {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+
+        const output = result.stdout || result.stderr || ''
+
+        // Check if output contains email list
+        if (!output || output.includes('No Emails') || output.includes('No messages') || !output.includes('From:')) {
+          const elapsed = Date.now() - startTime
+          const remaining = timeout - elapsed
+          if (remaining > 0) {
+            // Wait before polling again
+            const now = Date.now()
+            while (Date.now() - now < Math.min(pollInterval, remaining)) {
+              // Busy wait
+            }
+          }
+          continue
+        }
+
+        // mailsy m menu format:
+        // 4. 255578 is your Vercel sign up code - From:  registration@vercel.com
+        // Extract OTP from the menu list (can appear anywhere with pattern: "<6-digit> is your")
+        const lines = output.split('\n')
+        for (const line of lines) {
+          const codeMatch = line.match(/\b(\d{6})\s+is\s+your/)
+          if (codeMatch && codeMatch[1]) {
+            return codeMatch[1]
+          }
+        }
+
+        // Fallback: look for any 6-digit code
+        const fallbackMatch = output.match(/\b(\d{6})\b/)
+        if (fallbackMatch && fallbackMatch[1]) {
+          return fallbackMatch[1]
+        }
+      } catch (e) {
+        // Continue polling on error
+        console.error('[v0] Mailsy poll error:', e)
+      }
+
+      const elapsed = Date.now() - startTime
+      if (elapsed >= timeout) break
+
+      const remaining = timeout - elapsed
+      if (remaining > 0) {
+        const now = Date.now()
+        while (Date.now() - now < Math.min(pollInterval, remaining)) {
+          // Busy wait
+        }
+      }
     }
 
-    // Extract OTP from first email
-    const emailContent = emails[0].body || emails[0].text || ''
-    const match = emailContent.match(/code=(\d{6})/) || emailContent.match(/\b(\d{6})\b/)
-
-    return match ? match[1] : null
+    return null
   } catch (error) {
-    console.error('Mailsy OTP extraction error:', error)
+    console.error('[v0] Mailsy OTP extraction error:', error)
     return null
   }
 }
