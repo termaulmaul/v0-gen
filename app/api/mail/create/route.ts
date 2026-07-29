@@ -2,7 +2,7 @@ import { createMailsyAccount } from '@/lib/mailtm'
 
 export async function POST() {
   try {
-    const account = createMailsyAccount()
+    const account = await createMailsyAccount()
     return Response.json(account)
   } catch (error) {
     return Response.json(
