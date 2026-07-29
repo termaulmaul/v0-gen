@@ -41,11 +41,21 @@ export async function navigateToVercelSignup(): Promise<void> {
 
   try {
     const url = 'https://vercel.com/signup/v0'
-    log('NAV', `Navigating to ${url}...`)
-    await page.goto(url, { waitUntil: 'networkidle' })
-    log('NAV', 'Successfully navigated to Vercel signup')
+    log('NAV', `Starting navigation to ${url}...`)
+    
+    // Add debug info about current page
+    const currentUrl = page.url()
+    log('DEBUG', `Current page URL: ${currentUrl}`)
+    
+    // Navigate with a longer timeout
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    
+    // Check if we actually navigated
+    const newUrl = page.url()
+    log('DEBUG', `After goto - new URL: ${newUrl}`)
+    log('NAV', 'Navigation completed')
   } catch (error) {
-    log('ERROR', `Navigation failed: ${error}`)
+    log('ERROR', `Navigation failed: ${error instanceof Error ? error.message : String(error)}`)
     throw error
   }
 }
